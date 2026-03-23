@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use crate::{Error, Result, ToMessagePack};
+use crate::{Error, Result, ToMessagePack, consts::*};
 
 pub trait Write {
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<()>;
@@ -26,9 +26,7 @@ pub trait Write {
         if u <= 127 {
             self.write_pos_fixint(u)
         } else {
-            let mut slice = [0u8; 2];
-            slice[0] = 0xcc;
-            slice[1] = u;
+            let slice = [UINT8_MARKER, u];
             self.write_bytes(&slice)
         }
     }
@@ -38,21 +36,14 @@ pub trait Write {
         match u {
             0..=127 => self.write_pos_fixint(u as u8),
             128..=255 => {
-                let mut slice = [0u8; 2];
-                slice[0] = 0xcc;
-                slice[1] = u as u8;
+                let slice = [UINT8_MARKER, u as u8];
                 self.write_bytes(&slice)
             }
             _ => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xcd;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (u as u16).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        2,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = UINT16_MARKER;
+                *tail = u.to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -63,33 +54,21 @@ pub trait Write {
         match u {
             0..=127 => self.write_pos_fixint(u as u8),
             128..=255 => {
-                let mut slice = [0u8; 2];
-                slice[0] = 0xcc;
-                slice[1] = u as u8;
+                let slice = [UINT8_MARKER, u as u8];
                 self.write_bytes(&slice)
             }
             256..=65535 => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xcd;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (u as u16).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        2,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = UINT16_MARKER;
+                *tail = (u as u16).to_be_bytes();
                 self.write_bytes(&slice)
             }
             _ => {
                 let mut slice = [0u8; 5];
-                slice[0] = 0xce;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (u as u32).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        4,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = UINT32_MARKER;
+                *tail = (u as u32).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -100,43 +79,28 @@ pub trait Write {
         match u {
             0..=127 => self.write_pos_fixint(u as u8),
             128..=255 => {
-                let slice = [0xcc, u as u8];
+                let slice = [UINT8_MARKER, u as u8];
                 self.write_bytes(&slice)
             }
             256..=65535 => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xcd;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (u as u16).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        2,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = UINT16_MARKER;
+                *tail = (u as u16).to_be_bytes();
                 self.write_bytes(&slice)
             }
             65536..=4294967295 => {
                 let mut slice = [0u8; 5];
-                slice[0] = 0xce;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (u as u32).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        4,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = UINT32_MARKER;
+                *tail = (u as u32).to_be_bytes();
                 self.write_bytes(&slice)
             }
             _ => {
                 let mut slice = [0u8; 9];
-                slice[0] = 0xcf;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (u as u64).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        8,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = UINT64_MARKER;
+                *tail = (u as u64).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -148,9 +112,7 @@ pub trait Write {
             0..=127 => self.write_pos_fixint(i as u8),
             -32..=-1 => self.write_neg_fixint(i as i8),
             _ => {
-                let mut slice = [0u8; 2];
-                slice[0] = 0xd0;
-                slice[1] = i as u8;
+                let slice = [INT8_MARKER, i as u8];
                 self.write_bytes(&slice)
             }
         }
@@ -162,19 +124,14 @@ pub trait Write {
             0..=127 => self.write_pos_fixint(i as u8),
             -32..=-1 => self.write_neg_fixint(i as i8),
             -128..=127 => {
-                let slice = [0xd0, i as u8];
+                let slice = [INT8_MARKER, i as u8];
                 self.write_bytes(&slice)
             }
             _ => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xd1;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        i.to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        2,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = INT16_MARKER;
+                *tail = (i as i16).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -186,28 +143,21 @@ pub trait Write {
             0..=127 => self.write_pos_fixint(i as u8),
             -32..=-1 => self.write_neg_fixint(i as i8),
             -128..=127 => {
-                let slice = [0xd0, i as u8];
+                let slice = [INT8_MARKER, i as u8];
                 self.write_bytes(&slice)
             }
             -32768..=32767 => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xd1;
-                let be = (i as i16).to_be_bytes();
-                unsafe {
-                    core::ptr::copy_nonoverlapping(be.as_ptr(), slice.as_mut_ptr().add(1), 2);
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = INT16_MARKER;
+                *tail = (i as i16).to_be_bytes();
                 self.write_bytes(&slice)
             }
             _ => {
                 let mut slice = [0u8; 5];
-                slice[0] = 0xd2;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        i.to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        4,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = INT32_MARKER;
+                *tail = (i as i32).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -219,37 +169,28 @@ pub trait Write {
             0..=127 => self.write_pos_fixint(i as u8),
             -32..=-1 => self.write_neg_fixint(i as i8),
             -128..=127 => {
-                let slice = [0xd0, i as u8];
+                let slice = [INT8_MARKER, i as u8];
                 self.write_bytes(&slice)
             }
             -32768..=32767 => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xd1;
-                let be = (i as i16).to_be_bytes();
-                unsafe {
-                    core::ptr::copy_nonoverlapping(be.as_ptr(), slice.as_mut_ptr().add(1), 2);
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = INT16_MARKER;
+                *tail = (i as i16).to_be_bytes();
                 self.write_bytes(&slice)
             }
             -2147483648..=2147483647 => {
                 let mut slice = [0u8; 5];
-                slice[0] = 0xd2;
-                let be = (i as i32).to_be_bytes();
-                unsafe {
-                    core::ptr::copy_nonoverlapping(be.as_ptr(), slice.as_mut_ptr().add(1), 4);
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = INT32_MARKER;
+                *tail = (i as i32).to_be_bytes();
                 self.write_bytes(&slice)
             }
             _ => {
                 let mut slice = [0u8; 9];
-                slice[0] = 0xd3;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        i.to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        8,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = INT64_MARKER;
+                *tail = (i as i64).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -257,26 +198,24 @@ pub trait Write {
 
     #[inline(always)]
     fn write_boolean(&mut self, b: bool) -> Result<()> {
-        self.write_byte(if b { 0xc3 } else { 0xc2 })
+        self.write_byte(if b { TRUE_MARKER } else { FALSE_MARKER })
     }
 
     #[inline(always)]
     fn write_f32(&mut self, f: f32) -> Result<()> {
         let mut slice = [0u8; 5];
-        slice[0] = 0xca;
-        unsafe {
-            core::ptr::copy_nonoverlapping(f.to_be_bytes().as_ptr(), slice.as_mut_ptr().add(1), 4);
-        }
+        let [head, tail @ ..] = &mut slice;
+        *head = FLOAT32_MARKER;
+        *tail = f.to_be_bytes();
         self.write_bytes(&slice)
     }
 
     #[inline(always)]
     fn write_f64(&mut self, f: f64) -> Result<()> {
         let mut slice = [0u8; 9];
-        slice[0] = 0xcb;
-        unsafe {
-            core::ptr::copy_nonoverlapping(f.to_be_bytes().as_ptr(), slice.as_mut_ptr().add(1), 8);
-        }
+        let [head, tail @ ..] = &mut slice;
+        *head = FLOAT64_MARKER;
+        *tail = f.to_be_bytes();
         self.write_bytes(&slice)
     }
 
@@ -290,21 +229,27 @@ pub trait Write {
             }
             // Str8
             32..=255 => {
-                let header = [0xd9, len as u8];
+                let header = [STR8_MARKER, len as u8];
                 self.write_bytes(&header)?;
                 self.write_bytes(s.as_bytes())?;
             }
             // Str16
             256..=65535 => {
-                let len_bytes = (len as u16).to_be_bytes();
-                let header = [0xda, len_bytes[0], len_bytes[1]];
+                let len_bytes: [u8; 2] = (len as u16).to_be_bytes();
+                let header = [STR16_MARKER, len_bytes[0], len_bytes[1]];
                 self.write_bytes(&header)?;
                 self.write_bytes(s.as_bytes())?;
             }
             // Str32
             _ => {
-                let len_bytes = (len as u32).to_be_bytes();
-                let header = [0xdb, len_bytes[0], len_bytes[1], len_bytes[2], len_bytes[3]];
+                let len_bytes: [u8; 4] = (len as u32).to_be_bytes();
+                let header = [
+                    STR32_MARKER,
+                    len_bytes[0],
+                    len_bytes[1],
+                    len_bytes[2],
+                    len_bytes[3],
+                ];
                 self.write_bytes(&header)?;
                 self.write_bytes(s.as_bytes())?;
             }
@@ -317,23 +262,29 @@ pub trait Write {
         match len {
             // Bin8
             0..=255 => {
-                let header = [0xc4, len as u8];
+                let header = [BIN8_MARKER, len as u8];
                 self.write_bytes(&header)?;
                 self.write_bytes(data)?;
                 Ok(())
             }
             // Bin16
             256..=65535 => {
-                let len_bytes = (len as u16).to_be_bytes();
-                let header = [0xc5, len_bytes[0], len_bytes[1]];
+                let len_bytes: [u8; 2] = (len as u16).to_be_bytes();
+                let header = [BIN16_MARKER, len_bytes[0], len_bytes[1]];
                 self.write_bytes(&header)?;
                 self.write_bytes(data)?;
                 Ok(())
             }
             // Bin32
             _ => {
-                let len_bytes = (len as u32).to_be_bytes();
-                let header = [0xc6, len_bytes[0], len_bytes[1], len_bytes[2], len_bytes[3]];
+                let len_bytes: [u8; 4] = (len as u32).to_be_bytes();
+                let header = [
+                    BIN32_MARKER,
+                    len_bytes[0],
+                    len_bytes[1],
+                    len_bytes[2],
+                    len_bytes[3],
+                ];
                 self.write_bytes(&header)?;
                 self.write_bytes(data)?;
                 Ok(())
@@ -349,15 +300,10 @@ pub trait Write {
         // timestamp 32: sec in [0, 2^32-1], nsec == 0
         if nanoseconds == 0 && (0..=u32::MAX as i64).contains(&seconds) {
             let mut buf = [0u8; 6];
-            buf[0] = 0xd6;
-            buf[1] = 0xff;
-            unsafe {
-                core::ptr::copy_nonoverlapping(
-                    (seconds as u32).to_be_bytes().as_ptr(),
-                    buf.as_mut_ptr().add(2),
-                    4,
-                );
-            }
+            let [head, type_marker, tail @ ..] = &mut buf;
+            *head = TIMESTAMP32_MARKER;
+            *type_marker = 0xff;
+            *tail = (seconds as u32).to_be_bytes();
             return self.write_bytes(&buf);
         }
 
@@ -365,32 +311,28 @@ pub trait Write {
         if (0..=(1i64 << 34) - 1).contains(&seconds) {
             let data = ((nanoseconds as u64) << 34) | (seconds as u64);
             let mut buf = [0u8; 10];
-            buf[0] = 0xd7;
-            buf[1] = 0xff;
-            unsafe {
-                core::ptr::copy_nonoverlapping(
-                    data.to_be_bytes().as_ptr(),
-                    buf.as_mut_ptr().add(2),
-                    8,
-                );
-            }
+            let [head, type_marker, tail @ ..] = &mut buf;
+            *head = TIMESTAMP64_MARKER;
+            *type_marker = 0xff;
+            *tail = data.to_be_bytes();
             return self.write_bytes(&buf);
         }
 
         // timestamp 96
         let mut buf = [0u8; 15];
-        buf[0] = 0xc7;
-        buf[1] = 12;
-        buf[2] = 0xff;
+        let [head, len_marker, type_marker, tail @ ..] = &mut buf;
+        *head = TIMESTAMP96_MARKER;
+        *len_marker = 12;
+        *type_marker = 0xff;
         unsafe {
             core::ptr::copy_nonoverlapping(
                 nanoseconds.to_be_bytes().as_ptr(),
-                buf.as_mut_ptr().add(3),
+                tail.as_mut_ptr(),
                 4,
             );
             core::ptr::copy_nonoverlapping(
                 seconds.to_be_bytes().as_ptr(),
-                buf.as_mut_ptr().add(7),
+                tail.as_mut_ptr().add(4),
                 8,
             );
         }
@@ -405,27 +347,17 @@ pub trait Write {
             // Array16
             16..=65535 => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xdc;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (len as u16).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        2,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = ARRAY16_MARKER;
+                *tail = (len as u16).to_be_bytes();
                 self.write_bytes(&slice)
             }
             // Array32
             _ => {
                 let mut slice = [0u8; 5];
-                slice[0] = 0xdd;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (len as u32).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        4,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = ARRAY32_MARKER;
+                *tail = (len as u32).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -439,27 +371,17 @@ pub trait Write {
             // Map16
             16..=65535 => {
                 let mut slice = [0u8; 3];
-                slice[0] = 0xde;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (len as u16).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        2,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = MAP16_MARKER;
+                *tail = (len as u16).to_be_bytes();
                 self.write_bytes(&slice)
             }
             // Map32
             _ => {
                 let mut slice = [0u8; 5];
-                slice[0] = 0xdf;
-                unsafe {
-                    core::ptr::copy_nonoverlapping(
-                        (len as u32).to_be_bytes().as_ptr(),
-                        slice.as_mut_ptr().add(1),
-                        4,
-                    );
-                }
+                let [head, tail @ ..] = &mut slice;
+                *head = MAP32_MARKER;
+                *tail = (len as u32).to_be_bytes();
                 self.write_bytes(&slice)
             }
         }
@@ -521,6 +443,7 @@ impl Write for VecWriter {
                 self.buffer.set_len(len + 2);
             }
         }
+
         Ok(())
     }
 
