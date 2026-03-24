@@ -13,7 +13,7 @@ derive = ["dep:zerompk_derive"]
 chrono = ["dep:chrono"]
 
 [dependencies]
-zerompk_derive = { version = "0.1.0", path = "../zerompk_derive", optional = true }
+zerompk_derive = { version = "0.2.0", path = "../zerompk_derive", optional = true }
 chrono = { version = "0.4", default-features = false, features = [
     "alloc",
 ], optional = true }
