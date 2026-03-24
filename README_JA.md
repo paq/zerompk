@@ -449,8 +449,6 @@ impl<'__msgpack_de> ::zerompk::FromMessagePack<'__msgpack_de> for Point {
 
 複雑なvisitorを生成するSerdeに比べ、zerompkのコードは極めてシンプルです。これは実行時パフォーマンスの利点だけでなく、副次的にバイナリサイズやコンパイル時間の削減に繋がります。
 
-もちろん、zerompkはSerdeの`Serialize`/`Deserialize`もサポートしています。しかし、パフォーマンスが重要な場面では`FromMessagePack`/`ToMessagePack`を使うことが推奨されます。
-
 ### Zero Copy
 
 Serde同様、zerompkは元のシリアライズされたデータを直接参照するzero-copyデシリアライズをサポートしています。
