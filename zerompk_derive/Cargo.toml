@@ -1,5 +1,7 @@
 [package]
 name = "zerompk_derive"
+repository = "https://github.com/nuskey8/zerompk"
+documentation = "https://docs.rs/zerompk_derive"
 description = "proc-macro crate for zerompk"
 version = "0.2.1"
 edition = "2024"
