@@ -108,6 +108,23 @@ enum Event {
 }
 
 #[derive(ToMessagePack, FromMessagePack, Debug, PartialEq)]
+#[msgpack(c_enum)]
+#[repr(u8)]
+enum HttpStatus {
+    Ok = 0,
+    NotFound = 4,
+    InternalServerError = 5,
+}
+
+#[derive(ToMessagePack, FromMessagePack, Debug, PartialEq)]
+#[msgpack(c_enum)]
+enum BasicLevel {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(ToMessagePack, FromMessagePack, Debug, PartialEq)]
 struct RecursiveNode {
     next: Option<Box<RecursiveNode>>,
 }
@@ -250,7 +267,6 @@ fn derive_borrowed_fields_are_zero_copy_and_bin() {
 
     let decoded: BorrowedPayload = zerompk::from_msgpack(&encoded).unwrap();
     assert_eq!(decoded, value);
-
     assert_eq!(decoded.text.as_ptr(), encoded[2..4].as_ptr());
     assert_eq!(decoded.data.as_ptr(), encoded[6..9].as_ptr());
 }
@@ -406,6 +422,32 @@ fn derive_enum_named_map_variant_ignores_field() {
             y: 20,
         }
     );
+}
+
+#[test]
+fn derive_c_enum_with_explicit_discriminant() {
+    let value = HttpStatus::InternalServerError;
+    let data = zerompk::to_msgpack_vec(&value).unwrap();
+    assert_eq!(data, vec![0x05]);
+
+    let decoded: HttpStatus = zerompk::from_msgpack(&data).unwrap();
+    assert_eq!(decoded, value);
+}
+
+#[test]
+fn derive_c_enum_with_implicit_discriminant() {
+    let value = BasicLevel::Medium;
+    let data = zerompk::to_msgpack_vec(&value).unwrap();
+    assert_eq!(data, vec![0x01]);
+
+    let decoded: BasicLevel = zerompk::from_msgpack(&data).unwrap();
+    assert_eq!(decoded, value);
+}
+
+#[test]
+fn derive_c_enum_unknown_value_is_error() {
+    let err = zerompk::from_msgpack::<HttpStatus>(&[0x03]).unwrap_err();
+    assert!(matches!(err, zerompk::Error::InvalidMarker(0)));
 }
 
 #[test]

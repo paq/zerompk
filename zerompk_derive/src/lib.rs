@@ -38,8 +38,14 @@ enum Repr {
     Map,
 }
 
-fn parse_repr_from_attrs(attrs: &[syn::Attribute]) -> Result<Option<Repr>> {
+struct TypeConfig {
+    repr: Option<Repr>,
+    c_enum: bool,
+}
+
+fn parse_type_config_from_attrs(attrs: &[syn::Attribute]) -> Result<TypeConfig> {
     let mut repr = None;
+    let mut c_enum = false;
 
     for attr in attrs {
         if !attr.path().is_ident("msgpack") {
@@ -62,13 +68,19 @@ fn parse_repr_from_attrs(attrs: &[syn::Attribute]) -> Result<Option<Repr>> {
             } else if meta.path.is_ident("key") {
                 // handled at field/variant level
                 Ok(())
+            } else if meta.path.is_ident("c_enum") {
+                if c_enum {
+                    return Err(meta.error("duplicate `c_enum` attribute"));
+                }
+                c_enum = true;
+                Ok(())
             } else {
-                Err(meta.error("expected `array`, `map`, or `key = ...`"))
+                Err(meta.error("expected `array`, `map`, `c_enum`, or `key = ...`"))
             }
         })?;
     }
 
-    Ok(repr)
+    Ok(TypeConfig { repr, c_enum })
 }
 
 fn add_trait_bounds(mut generics: Generics, kind: DeriveKind) -> Generics {
@@ -651,7 +663,7 @@ fn expand(input: DeriveInput, kind: DeriveKind) -> Result<proc_macro2::TokenStre
         ..
     } = input;
 
-    let repr_attr = parse_repr_from_attrs(&attrs)?;
+    let type_cfg = parse_type_config_from_attrs(&attrs)?;
     let generics = add_trait_bounds(generics, kind);
     let lifetime_params: Vec<_> = generics
         .lifetimes()
@@ -661,20 +673,32 @@ fn expand(input: DeriveInput, kind: DeriveKind) -> Result<proc_macro2::TokenStre
 
     let body = match data {
         Data::Struct(data) => {
-            let repr = repr_attr.unwrap_or(Repr::Array);
+            if type_cfg.c_enum {
+                return Err(syn::Error::new(
+                    ident.span(),
+                    "`c_enum` is supported only on enums",
+                ));
+            }
+
+            let repr = type_cfg.repr.unwrap_or(Repr::Array);
             match repr {
                 Repr::Array => expand_array_struct(&data)?,
                 Repr::Map => expand_map_struct(&data)?,
             }
         }
         Data::Enum(data) => {
-            if repr_attr.is_some() {
+            if type_cfg.repr.is_some() {
                 return Err(syn::Error::new(
                     ident.span(),
                     "enum itself is always encoded as [tag, payload], so top-level #[msgpack(array/map)] is not allowed",
                 ));
             }
-            expand_enum(&data)?
+
+            if type_cfg.c_enum {
+                expand_c_enum(&data)?
+            } else {
+                expand_enum(&data)?
+            }
         }
         _ => {
             return Err(syn::Error::new(
@@ -1042,6 +1066,49 @@ fn expand_map_struct(data: &DataStruct) -> Result<ImplBody> {
         )*
 
         Ok(Self { #( #init_fields ),* })
+    };
+
+    Ok(ImplBody { write, read })
+}
+
+fn expand_c_enum(data: &DataEnum) -> Result<ImplBody> {
+    let mut write_arms = Vec::new();
+    let mut read_arms = Vec::new();
+
+    for variant in &data.variants {
+        let v_ident = &variant.ident;
+
+        if !matches!(variant.fields, Fields::Unit) {
+            return Err(syn::Error::new(
+                variant.span(),
+                "`c_enum` supports only unit variants",
+            ));
+        }
+
+        write_arms.push(quote! {
+            Self::#v_ident => {
+                writer.write_u64(Self::#v_ident as u64)?;
+                Ok(())
+            }
+        });
+
+        read_arms.push(quote! {
+            __value if __value == (Self::#v_ident as u64) => Ok(Self::#v_ident)
+        });
+    }
+
+    let write = quote! {
+        match self {
+            #( #write_arms ),*
+        }
+    };
+
+    let read = quote! {
+        let __value = reader.read_u64()?;
+        match __value {
+            #( #read_arms, )*
+            _ => Err(::zerompk::Error::InvalidMarker(0)),
+        }
     };
 
     Ok(ImplBody { write, read })
