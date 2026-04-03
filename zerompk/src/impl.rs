@@ -137,9 +137,12 @@ impl<T> ToMessagePack for core::marker::PhantomData<T> {
 // string, binary types
 // -------------------------------------------------------------------------------
 
-impl<'a> FromMessagePack<'a> for &'a str {
+impl<'de, 'a> FromMessagePack<'de> for &'a str
+where
+    'de: 'a,
+{
     #[inline(always)]
-    fn read<R: Read<'a>>(reader: &mut R) -> crate::Result<Self>
+    fn read<R: Read<'de>>(reader: &mut R) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -157,9 +160,12 @@ impl<'a> ToMessagePack for &'a str {
     }
 }
 
-impl<'a> FromMessagePack<'a> for &'a [u8] {
+impl<'de, 'a> FromMessagePack<'de> for &'a [u8]
+where
+    'de: 'a,
+{
     #[inline(always)]
-    fn read<R: Read<'a>>(reader: &mut R) -> crate::Result<Self>
+    fn read<R: Read<'de>>(reader: &mut R) -> crate::Result<Self>
     where
         Self: Sized,
     {

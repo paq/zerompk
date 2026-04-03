@@ -135,6 +135,11 @@ struct BorrowedPayload<'a> {
     data: &'a [u8],
 }
 
+#[derive(ToMessagePack, FromMessagePack, Debug, PartialEq)]
+struct BorrowedList<'a> {
+    foo: Vec<&'a str>,
+}
+
 fn recursive_node_msgpack(depth: usize) -> Vec<u8> {
     let mut out = Vec::with_capacity(depth + 1);
     for _ in 0..depth {
@@ -269,6 +274,28 @@ fn derive_borrowed_fields_are_zero_copy_and_bin() {
     assert_eq!(decoded, value);
     assert_eq!(decoded.text.as_ptr(), encoded[2..4].as_ptr());
     assert_eq!(decoded.data.as_ptr(), encoded[6..9].as_ptr());
+}
+
+#[test]
+fn derive_nested_borrowed_vec_of_str() {
+    let value = BorrowedList {
+        foo: vec!["hello", "world"],
+    };
+
+    let encoded = zerompk::to_msgpack_vec(&value).unwrap();
+    assert_eq!(
+        encoded,
+        vec![
+            0x91, // [foo]
+            0x92, // ["hello", "world"]
+            0xa5, b'h', b'e', b'l', b'l', b'o', 0xa5, b'w', b'o', b'r', b'l', b'd',
+        ]
+    );
+
+    let decoded: BorrowedList = zerompk::from_msgpack(&encoded).unwrap();
+    assert_eq!(decoded, value);
+    assert_eq!(decoded.foo[0].as_ptr(), encoded[3..8].as_ptr());
+    assert_eq!(decoded.foo[1].as_ptr(), encoded[9..14].as_ptr());
 }
 
 #[test]
