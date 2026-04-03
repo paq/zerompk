@@ -136,10 +136,7 @@ struct BorrowedPayload<'a> {
 }
 
 fn recursive_node_msgpack(depth: usize) -> Vec<u8> {
-    let mut out = Vec::with_capacity(depth + 1);
-    for _ in 0..depth {
-        out.push(0x91); // [next]
-    }
+    let mut out = vec![0x91; depth]; // [next]
     out.push(0xc0); // None
     out
 }

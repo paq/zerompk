@@ -190,7 +190,7 @@ impl<'a> Write for SliceWriter<'a> {
                 let buf = self.take_array::<5>()?;
                 let [head, tail @ ..] = buf;
                 *head = UINT32_MARKER;
-                *tail = (u as u32).to_be_bytes();
+                *tail = u.to_be_bytes();
                 Ok(())
             }
         }
@@ -227,7 +227,7 @@ impl<'a> Write for SliceWriter<'a> {
                 let buf = self.take_array::<9>()?;
                 let [head, tail @ ..] = buf;
                 *head = UINT64_MARKER;
-                *tail = (u as u64).to_be_bytes();
+                *tail = u.to_be_bytes();
                 Ok(())
             }
         }
@@ -276,7 +276,7 @@ impl<'a> Write for SliceWriter<'a> {
                 let buf = self.take_array::<3>()?;
                 let [head, tail @ ..] = buf;
                 *head = INT16_MARKER;
-                *tail = (i as i16).to_be_bytes();
+                *tail = i.to_be_bytes();
                 Ok(())
             }
         }
@@ -311,7 +311,7 @@ impl<'a> Write for SliceWriter<'a> {
                 let buf = self.take_array::<5>()?;
                 let [head, tail @ ..] = buf;
                 *head = INT32_MARKER;
-                *tail = (i as i32).to_be_bytes();
+                *tail = i.to_be_bytes();
                 Ok(())
             }
         }
@@ -353,7 +353,7 @@ impl<'a> Write for SliceWriter<'a> {
                 let buf = self.take_array::<9>()?;
                 let [head, tail @ ..] = buf;
                 *head = INT64_MARKER;
-                *tail = (i as i64).to_be_bytes();
+                *tail = i.to_be_bytes();
                 Ok(())
             }
         }
@@ -519,11 +519,7 @@ impl<'a> Write for SliceWriter<'a> {
         unsafe {
             let tail_ptr = tail.as_mut_ptr();
             core::ptr::copy_nonoverlapping(nanoseconds.to_be_bytes().as_ptr(), tail_ptr, 4);
-            core::ptr::copy_nonoverlapping(
-                (seconds as i64).to_be_bytes().as_ptr(),
-                tail_ptr.add(4),
-                8,
-            );
+            core::ptr::copy_nonoverlapping(seconds.to_be_bytes().as_ptr(), tail_ptr.add(4), 8);
         }
         Ok(())
     }
@@ -880,7 +876,7 @@ impl Write for VecWriter {
                     let ptr = self.buffer.as_mut_ptr().add(self.buffer.len());
                     *ptr = INT16_MARKER;
                     ptr.add(1)
-                        .copy_from_nonoverlapping((i as i16).to_be_bytes().as_ptr(), 2);
+                        .copy_from_nonoverlapping(i.to_be_bytes().as_ptr(), 2);
                     self.buffer.set_len(self.buffer.len() + 3);
                 }
                 Ok(())
@@ -926,7 +922,7 @@ impl Write for VecWriter {
                     let ptr = self.buffer.as_mut_ptr().add(self.buffer.len());
                     *ptr = INT32_MARKER;
                     ptr.add(1)
-                        .copy_from_nonoverlapping((i as i32).to_be_bytes().as_ptr(), 4);
+                        .copy_from_nonoverlapping(i.to_be_bytes().as_ptr(), 4);
                     self.buffer.set_len(self.buffer.len() + 5);
                 }
                 Ok(())
@@ -1160,7 +1156,7 @@ impl Write for VecWriter {
             ptr.add(3)
                 .copy_from_nonoverlapping(nanoseconds.to_be_bytes().as_ptr(), 4);
             ptr.add(7)
-                .copy_from_nonoverlapping((seconds as i64).to_be_bytes().as_ptr(), 8);
+                .copy_from_nonoverlapping(seconds.to_be_bytes().as_ptr(), 8);
             self.buffer.set_len(self.buffer.len() + 15);
         }
         Ok(())
@@ -1341,7 +1337,7 @@ impl<W: std::io::Write> IOWriter<W> {
 
     #[inline(always)]
     fn write_all(&mut self, data: &[u8]) -> Result<()> {
-        self.writer.write_all(data).map_err(|e| Error::IoError(e))
+        self.writer.write_all(data).map_err(Error::IoError)
     }
 }
 
@@ -1381,7 +1377,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
                 Ok(())
             }
             _ => {
-                let len_bytes = (u as u16).to_be_bytes();
+                let len_bytes = u.to_be_bytes();
                 self.write_all(&[UINT16_MARKER, len_bytes[0], len_bytes[1]])?;
                 Ok(())
             }
@@ -1497,7 +1493,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
                 Ok(())
             }
             _ => {
-                let len_bytes = (i as i16).to_be_bytes();
+                let len_bytes = i.to_be_bytes();
                 self.write_all(&[INT16_MARKER, len_bytes[0], len_bytes[1]])?;
                 Ok(())
             }
@@ -1525,7 +1521,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
                 Ok(())
             }
             _ => {
-                let len_bytes = (i as i32).to_be_bytes();
+                let len_bytes = i.to_be_bytes();
                 self.write_all(&[
                     INT32_MARKER,
                     len_bytes[0],
@@ -1570,7 +1566,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
                 Ok(())
             }
             _ => {
-                let len_bytes = (i as i64).to_be_bytes();
+                let len_bytes = i.to_be_bytes();
                 self.write_all(&[
                     INT64_MARKER,
                     len_bytes[0],
@@ -1726,7 +1722,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
         }
 
         // timestamp 96
-        let sec_bytes = (seconds as i64).to_be_bytes();
+        let sec_bytes = seconds.to_be_bytes();
         let nsec_bytes = nanoseconds.to_be_bytes();
         self.write_all(&[
             TIMESTAMP96_MARKER,
