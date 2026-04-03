@@ -64,8 +64,7 @@ pub trait ToMessagePack {
 /// ```
 pub fn from_msgpack<'a, T: FromMessagePack<'a>>(data: &'a [u8]) -> Result<T> {
     let mut reader = read::SliceReader::new(data);
-    let result = T::read(&mut reader);
-    result
+    T::read(&mut reader)
 }
 
 /// Serializes a value of type `T` into a `Vec<u8>` containing its MessagePack representation.
