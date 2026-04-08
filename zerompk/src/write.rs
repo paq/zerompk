@@ -7,6 +7,8 @@ use crate::{Error, Result, consts::*};
 /// ## Examples
 ///
 /// ```rust
+/// use zerompk::{ToMessagePack, Write, Result};
+/// 
 /// struct Point {
 ///     x: i32,
 ///     y: i32,
