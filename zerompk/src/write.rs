@@ -622,28 +622,28 @@ impl<'a> Write for SliceWriter<'a> {
                 Ok(())
             }
             0..=255 => {
-                let buf = self.take_slice(2 + len)?;
+                let buf = self.take_slice(3 + len)?;
                 unsafe {
-                    let (header, body) = buf.split_at_mut(2);
-                    header.copy_from_slice(&[EXT8_MARKER, len as u8]);
+                    let (header, body) = buf.split_at_mut(3);
+                    header.copy_from_slice(&[EXT8_MARKER, len as u8, type_id as u8]);
                     core::ptr::copy_nonoverlapping(data.as_ptr(), body.as_mut_ptr(), len);
                 }
                 Ok(())
             }
             256..=65535 => {
-                let buf = self.take_slice(3 + len)?;
+                let buf = self.take_slice(4 + len)?;
                 unsafe {
-                    let (header, body) = buf.split_at_mut(3);
+                    let (header, body) = buf.split_at_mut(4);
                     let len_bytes = (len as u16).to_be_bytes();
-                    header.copy_from_slice(&[EXT16_MARKER, len_bytes[0], len_bytes[1]]);
+                    header.copy_from_slice(&[EXT16_MARKER, len_bytes[0], len_bytes[1], type_id as u8]);
                     core::ptr::copy_nonoverlapping(data.as_ptr(), body.as_mut_ptr(), len);
                 }
                 Ok(())
             }
             _ => {
-                let buf = self.take_slice(5 + len)?;
+                let buf = self.take_slice(6 + len)?;
                 unsafe {
-                    let (header, body) = buf.split_at_mut(5);
+                    let (header, body) = buf.split_at_mut(6);
                     let len_bytes = (len as u32).to_be_bytes();
                     header.copy_from_slice(&[
                         EXT32_MARKER,
@@ -651,6 +651,7 @@ impl<'a> Write for SliceWriter<'a> {
                         len_bytes[1],
                         len_bytes[2],
                         len_bytes[3],
+                        type_id as u8,
                     ]);
                     core::ptr::copy_nonoverlapping(data.as_ptr(), body.as_mut_ptr(), len);
                 }
@@ -1290,37 +1291,40 @@ impl Write for VecWriter {
                 Ok(())
             }
             0..=255 => {
-                self.buffer.reserve(2 + len);
+                self.buffer.reserve(3 + len);
                 unsafe {
                     let ptr = self.buffer.as_mut_ptr().add(self.buffer.len());
                     *ptr = EXT8_MARKER;
                     *ptr.add(1) = len as u8;
-                    ptr.add(2).copy_from_nonoverlapping(data.as_ptr(), len);
-                    self.buffer.set_len(self.buffer.len() + 2 + len);
-                }
-                Ok(())
-            }
-            256..=65535 => {
-                self.buffer.reserve(3 + len);
-                unsafe {
-                    let ptr = self.buffer.as_mut_ptr().add(self.buffer.len());
-                    *ptr = EXT16_MARKER;
-                    let len_bytes = (len as u16).to_be_bytes();
-                    ptr.add(1).copy_from_nonoverlapping(len_bytes.as_ptr(), 2);
+                    *ptr.add(2) = type_id as u8;
                     ptr.add(3).copy_from_nonoverlapping(data.as_ptr(), len);
                     self.buffer.set_len(self.buffer.len() + 3 + len);
                 }
                 Ok(())
             }
+            256..=65535 => {
+                self.buffer.reserve(4 + len);
+                unsafe {
+                    let ptr = self.buffer.as_mut_ptr().add(self.buffer.len());
+                    *ptr = EXT16_MARKER;
+                    let len_bytes = (len as u16).to_be_bytes();
+                    ptr.add(1).copy_from_nonoverlapping(len_bytes.as_ptr(), 2);
+                    *ptr.add(3) = type_id as u8;
+                    ptr.add(4).copy_from_nonoverlapping(data.as_ptr(), len);
+                    self.buffer.set_len(self.buffer.len() + 4 + len);
+                }
+                Ok(())
+            }
             _ => {
-                self.buffer.reserve(5 + len);
+                self.buffer.reserve(6 + len);
                 unsafe {
                     let ptr = self.buffer.as_mut_ptr().add(self.buffer.len());
                     *ptr = EXT32_MARKER;
                     let len_bytes = (len as u32).to_be_bytes();
                     ptr.add(1).copy_from_nonoverlapping(len_bytes.as_ptr(), 4);
-                    ptr.add(5).copy_from_nonoverlapping(data.as_ptr(), len);
-                    self.buffer.set_len(self.buffer.len() + 5 + len);
+                    *ptr.add(5) = type_id as u8;
+                    ptr.add(6).copy_from_nonoverlapping(data.as_ptr(), len);
+                    self.buffer.set_len(self.buffer.len() + 6 + len);
                 }
                 Ok(())
             }
@@ -1868,7 +1872,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
             }
             256..=65535 => {
                 let len_bytes = (len as u16).to_be_bytes();
-                self.write_all(&[EXT16_MARKER, len_bytes[0], len_bytes[1]])?;
+                self.write_all(&[EXT16_MARKER, len_bytes[0], len_bytes[1], type_id as u8])?;
                 self.write_all(data)?;
                 Ok(())
             }
@@ -1880,6 +1884,7 @@ impl<W: std::io::Write> Write for IOWriter<W> {
                     len_bytes[1],
                     len_bytes[2],
                     len_bytes[3],
+                    type_id as u8,
                 ])?;
                 self.write_all(data)?;
                 Ok(())
