@@ -923,7 +923,7 @@ impl<R: std::io::Read> IOReader<R> {
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
         self.reader
             .read_exact(buf)
-            .map_err(|err| Error::IoError(err))
+            .map_err(Error::IoError)
     }
 
     #[inline(always)]

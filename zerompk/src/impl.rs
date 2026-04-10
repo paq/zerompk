@@ -153,10 +153,10 @@ where
     }
 }
 
-impl<'a> ToMessagePack for &'a str {
+impl ToMessagePack for &str {
     #[inline(always)]
     fn write<W: Write>(&self, writer: &mut W) -> crate::Result<()> {
-        writer.write_string(*self)
+        writer.write_string(self)
     }
 }
 
@@ -278,13 +278,13 @@ impl<T: Clone + ToMessagePack> ToMessagePack for alloc::borrow::Cow<'_, [T]> {
 impl<T: ToMessagePack + ?Sized> ToMessagePack for &T {
     #[inline(always)]
     fn write<W: Write>(&self, writer: &mut W) -> crate::Result<()> {
-        T::write(&self, writer)
+        T::write(self, writer)
     }
 }
 
 impl<T: ToMessagePack + ?Sized> ToMessagePack for &mut T {
     fn write<W: Write>(&self, writer: &mut W) -> crate::Result<()> {
-        T::write(&self, writer)
+        T::write(self, writer)
     }
 }
 
