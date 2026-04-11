@@ -1505,3 +1505,34 @@ impl<'de, R: std::io::Read> Read<'de> for IOReader<R> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::SliceReader;
+    use crate::{Error, FromMessagePack};
+
+    #[allow(dead_code)]
+    #[derive(Debug, zerompk_derive::FromMessagePack)]
+    #[msgpack(map)]
+    struct DuplicateKeyMap {
+        x: u8,
+        y: u8,
+    }
+
+    #[test]
+    fn derived_map_struct_duplicate_key_restores_reader_depth() {
+        let data = [
+            0x82, // fixmap with 2 entries
+            0xa1, b'x', // fixstr of length 1: "x"
+            0x01, // positive fixint: 1
+            0xa1, b'x', // fixstr of length 1: "x" (duplicate key)
+            0x02, // positive fixint: 2
+        ];
+        let mut reader = SliceReader::new(&data);
+
+        let err = DuplicateKeyMap::read(&mut reader).unwrap_err();
+
+        assert!(matches!(err, Error::KeyDuplicated(ref key) if key == "x"));
+        assert_eq!(reader.depth, 0);
+    }
+}
