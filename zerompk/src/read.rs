@@ -990,7 +990,9 @@ impl<'de, R: std::io::Read> Read<'de> for IOReader<R> {
 
     #[inline(always)]
     fn decrement_depth(&mut self) {
-        self.depth -= 1;
+        if self.depth > 0 {
+            self.depth -= 1;
+        }
     }
 
     #[inline(always)]
