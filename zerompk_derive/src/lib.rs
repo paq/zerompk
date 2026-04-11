@@ -1128,7 +1128,7 @@ fn expand_map_struct(data: &DataStruct) -> Result<ImplBody> {
             quote! {
                 #idx => {
                     if #slot.is_some() {
-                        return Err(::zerompk::Error::KeyDuplicated(#key_name.into()));
+                        break '__zerompk_read_map Err(::zerompk::Error::KeyDuplicated(#key_name.into()));
                     }
                     #slot = ::core::option::Option::Some(#read_expr);
                 }
@@ -1167,6 +1167,7 @@ fn expand_map_struct(data: &DataStruct) -> Result<ImplBody> {
     };
 
     let read = quote! {
+        '__zerompk_read_map: {
         reader.check_map_len(#count)?;
 
         #( let mut #slots: ::core::option::Option<#tys> = ::core::option::Option::None; )*
@@ -1189,7 +1190,8 @@ fn expand_map_struct(data: &DataStruct) -> Result<ImplBody> {
             let #names = #slots.ok_or_else(|| ::zerompk::Error::KeyNotFound(#key_lits.into()))?;
         )*
 
-        Ok(Self { #( #init_fields ),* })
+        break '__zerompk_read_map Ok(Self { #( #init_fields ),* });
+        }
     };
 
     Ok(ImplBody { write, read })
@@ -1690,7 +1692,7 @@ fn build_enum_variant_payload(
                             quote! {
                                 #idx => {
                                     if #slot.is_some() {
-                                        return Err(::zerompk::Error::KeyDuplicated(#key_name.into()));
+                                        break '__zerompk_read_map Err(::zerompk::Error::KeyDuplicated(#key_name.into()));
                                     }
                                     #slot = ::core::option::Option::Some(#read_expr);
                                 }
@@ -1734,6 +1736,7 @@ fn build_enum_variant_payload(
                     };
 
                     let read_ctor = quote! {
+                        '__zerompk_read_map: {
                         reader.check_map_len(#count)?;
 
                         #( let mut #slot_vars: ::core::option::Option<#active_tys> = ::core::option::Option::None; )*
@@ -1756,7 +1759,8 @@ fn build_enum_variant_payload(
                             let #active_names = #slot_vars.ok_or_else(|| ::zerompk::Error::KeyNotFound(#key_lits.into()))?;
                         )*
 
-                        Ok(Self::#v_ident { #( #init_fields ),* })
+                        break '__zerompk_read_map Ok(Self::#v_ident { #( #init_fields ),* });
+                        }
                     };
 
                     Ok((
