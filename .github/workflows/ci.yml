@@ -29,3 +29,20 @@ jobs:
       - run: cargo +nightly test --locked -p zerompk --lib --tests # skip doc tests since they require the derive feature
       - run: cargo +nightly test --locked -p zerompk --features derive
       - run: cargo +nightly test --locked -p zerompk_derive
+
+  wasm32:
+    name: wasm32
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - run: rustup toolchain install stable --profile minimal
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - run: cargo build --locked -p zerompk --target wasm32-unknown-unknown
+      - run: cargo build --locked -p zerompk --no-default-features --target wasm32-unknown-unknown
+      - run: cargo build --release --target wasm32-unknown-unknown
+        working-directory: tests/wasm32
+      - run: node tests.mjs target/wasm32-unknown-unknown/release/zerompk_wasm32_tests.wasm
+        working-directory: tests/wasm32
